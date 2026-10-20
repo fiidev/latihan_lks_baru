@@ -15,6 +15,6 @@ class DeliveryProof extends Model
 
     public function user()
     {
-        return $this->belongsTo(User::class, 'courier_by');
+        return $this->belongsTo(User::class, 'courier_id');
     }
 }

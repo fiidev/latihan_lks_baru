@@ -7,11 +7,12 @@ use Illuminate\Http\Request;
 
 class RoleMiddleware
 {
-    public function handle(Request $request, Closure $next, string ...$roles): mixed
+    public function handle(Request $request, Closure $next, ...$roles): mixed
     {
+        $allowed = explode(',', implode(',', $roles));
         $user = $request->user();
 
-        if (! $user || ! in_array($user->role, $roles)) {
+        if (! $user || ! in_array($user->role, $allowed)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Forbidden.',

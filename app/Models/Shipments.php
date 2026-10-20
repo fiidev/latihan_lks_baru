@@ -20,21 +20,21 @@ class Shipments extends Model
 
     public function shipping()
     {
-        return $this->belongsTo(ShippingService::class);
+        return $this->belongsTo(ShippingService::class, 'shipping_service_id');
     }
 
     public function payment()
     {
-        return $this->hasMany(Payment::class);
+        return $this->hasMany(Payment::class, 'shipment_id');
     }
 
     public function histories()
     {
-        return $this->hasMany(ShipmentStatusHistory::class);
+        return $this->hasMany(ShipmentStatusHistory::class, 'shipment_id');
     }
 
     public function delivery()
     {
-        return $this->hasMany(DeliveryProof::class);
+        return $this->hasMany(DeliveryProof::class, 'shipment_id');
     }
 }
