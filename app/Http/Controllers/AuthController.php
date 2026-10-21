@@ -42,7 +42,9 @@ class AuthController extends Controller
             'password' => 'required',
         ]);
 
-        if (! auth()->attempt($v)) {
+        $user = User::where('email', $v['email'])->first();
+
+        if (!$user || !Hash::check($v['password'], $user->password)) {
             return response()->json([
                 'success' => false,
                 'message' => 'The provided credentials are incorrect.',
@@ -50,7 +52,6 @@ class AuthController extends Controller
             ], 401);
         }
 
-        $user = auth()->user();
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
