@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Payment;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 class PaymentController extends Controller
@@ -17,7 +16,12 @@ class PaymentController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Payment can only be submitted for confirmed shipments.',
-                'errors' => [['field' => 'status', 'message' => 'Shipping fee is not confirmed yet.']],
+                'errors' => [
+                    [
+                        'field' => 'status',
+                        'message' => 'Shipping fee is not confirmed yet.',
+                    ],
+                ],
             ], 409);
         }
 
@@ -50,10 +54,14 @@ class PaymentController extends Controller
             'per_page' => 'nullable|integer|between:1,100',
         ]);
 
-        $payments = Payment::whereHas('shipment', fn ($q) => $q->where('customer_id', $req->user()->id))
-            ->with('shipment')
+        $userId = auth()->id();
+
+        $payments = Payment::with('shipment')
+            ->whereHas('shipment', function ($query) use ($userId) {
+                $query->where('customer_id', $userId);
+            })
             ->latest()
-            ->paginate($req->query('per_page', 10));
+            ->paginate(request()->query('per_page', 10), ['id', 'shipment_id']);
 
         return response()->json([
             'success' => true,
@@ -79,7 +87,11 @@ class PaymentController extends Controller
 
         $payment = Payment::with('shipment')->find($id);
         if (! $payment) {
-            return response()->json(['success' => false, 'message' => 'Payment not found.', 'errors' => []], 404);
+            return response()->json([
+                'success' => false,
+                'message' => 'Payment not found.',
+                'errors' => [],
+            ], 404);
         }
 
         if ($payment->status !== 'pending') {
@@ -95,40 +107,54 @@ class PaymentController extends Controller
                 return response()->json([
                     'success' => false,
                     'message' => 'The payment cannot be completed.',
-                    'errors' => [['field' => 'amount', 'message' => 'Must equal the confirmed shipping fee.']],
+                    'errors' => [
+                        [
+                            'field' => 'amount',
+                            'message' => 'Must equal the confirmed shipping fee.',
+                        ],
+                    ],
                 ], 422);
             }
         }
+        $payment->update([
+            'status' => $v['status'],
+            'verified_by' => auth()->id(),
+            'verified_at' => now(),
+        ]);
 
-        return DB::transaction(function () use ($payment, $v) {
-            $payment->update([
-                'status' => $v['status'],
-                'verified_by' => auth()->id(),
-                'verified_at' => now(),
-            ]);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Payment status updated successfully.',
-                'data' => $payment,
-            ]);
-        });
+        return response()->json([
+            'success' => true,
+            'message' => 'Payment status updated successfully.',
+            'data' => $payment,
+        ]);
     }
 
     public function proof(Request $req, $id)
     {
         $payment = Payment::with('shipment')->find($id);
         if (! $payment) {
-            return response()->json(['success' => false, 'message' => 'Payment not found.', 'errors' => []], 404);
+            return response()->json([
+                'success' => false,
+                'message' => 'Payment not found.',
+                'errors' => [],
+            ], 404);
         }
 
         $user = $req->user();
         if ($user->role === 'customer' && $payment->shipment->customer_id !== $user->id) {
-            return response()->json(['success' => false, 'message' => 'Forbidden.', 'errors' => []], 403);
+            return response()->json([
+                'success' => false,
+                'message' => 'Forbidden.',
+                'errors' => [],
+            ], 403);
         }
 
         if (! $payment->payment_proof || ! Storage::disk('local')->exists($payment->payment_proof)) {
-            return response()->json(['success' => false, 'message' => 'Payment proof not found.', 'errors' => []], 404);
+            return response()->json([
+                'success' => false,
+                'message' => 'Payment proof not found.',
+                'errors' => [],
+            ], 404);
         }
 
         return Storage::disk('local')->response($payment->payment_proof);

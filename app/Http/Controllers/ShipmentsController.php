@@ -65,17 +65,13 @@ class ShipmentsController extends Controller
         $shipments = $request->user()->shipments()
             ->when($request->status, fn ($q, $status) => $q->where('status', $status))
             ->latest()
+            ->select('id', 'tracking_number', 'status', 'shipping_fee')
             ->paginate($request->query('per_page', 10));
 
         return response()->json([
             'success' => true,
             'message' => 'Shipments retrieved successfully.',
-            'data' => array_map(fn ($shipment) => [
-                'id' => $shipment->id,
-                'tracking_number' => $shipment->tracking_number,
-                'status' => $shipment->status,
-                'shipping_fee' => $shipment->shipping_fee,
-            ], $shipments->items()),
+            'data' => $shipments->items(),
             'meta' => [
                 'pagination' => [
                     'page' => $shipments->currentPage(),
@@ -92,16 +88,23 @@ class ShipmentsController extends Controller
         $ship = Shipments::find($id);
 
         if (! $ship) {
-            return response()->json(['success' => false, 'message' => 'Shipment not found.', 'errors' => []], 404);
+            return response()->json([
+                'success' => false,
+                'message' => 'Shipment not found.',
+                'errors' => [],
+            ], 404);
         }
 
         $user = $req->user();
-        if ($user->role === 'customer' && $ship->customer_id !== $user->id) {
-            return response()->json(['success' => false, 'message' => 'Shipment not found.', 'errors' => []], 404);
-        }
-
-        if ($user->role === 'courier' && $ship->courier_id !== $user->id) {
-            return response()->json(['success' => false, 'message' => 'Shipment not found.', 'errors' => []], 404);
+        if (
+            ($user->role === 'customer' && $ship->customer_id !== $user->id) ||
+            ($user->role === 'courier' && $ship->courier_id !== $user->id)
+        ) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Shipment not found.',
+                'errors' => [],
+            ], 404);
         }
 
         return response()->json([
@@ -119,7 +122,12 @@ class ShipmentsController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'This shipment can no longer be cancelled.',
-                'errors' => [['field' => 'status', 'message' => 'Only eligible early-state shipments can be cancelled.']],
+                'errors' => [
+                    [
+                        'field' => 'status',
+                        'message' => 'Only eligible early-state shipments can be cancelled.',
+                    ],
+                ],
             ], 409);
         }
 

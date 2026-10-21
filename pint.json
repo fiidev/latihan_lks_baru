@@ -1,0 +1,12 @@
+{
+    "preset": "laravel",
+    "rules": {
+        "array_syntax": {
+            "syntax": "short"
+        },
+        "whitespace_after_comma_in_array": true,
+        "trailing_comma_in_multiline": {
+            "elements": ["arrays"]
+        }
+    }
+}
